@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<style>
+			body {
+				background: black;
+			}
+			#space {
+				position: absolute;
+				background: rgba(0,0,0,0.4);
+				z-index: 5;
+			}
+			#alpha {
+				position: absolute;
+				background: url('background.jpg');
+				z-index: 1;
+				width: 100%;
+				height: 100%;
+			}
+		</style>
+	</head>
+	<body>
+		<img id='ship1' src='ship1.png' style='display:none'></img>
+		
+		<canvas id='space' width='500' height='500'></canvas>
+		<div id='alpha'></div>
+		
+		<script>
+		
+			var currentShip;
+			
+			var space_width = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+			var space_height = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+			var space = document.getElementById('space');
+			
+			//var alpha = document.getElementById('alpha');
+			//alpha.style.width = space_width+'px';
+			//alpha.style.height = space_height+'px';
+			//alpha.style.background = "url('background.jpg')";
+			
+			space.width = space_width;
+			space.height = space_height;
+			space.style.backgroundSize = space_width+'px '+space_height+'px';
+			var context = space.getContext('2d');
+			context.setTransform(1, 0, 0, 1, 0, 0);
+			context.translate((space_width/2)+0.5, (space_height/2)+0.5);
+			
+			var WeaponTypes = [
+				{
+					name: 'Pulse Ray',
+					range: [0,2750],
+					speed: 3000,
+					rank: {
+						I: {
+							mass: 10,
+							dps: 3
+						},
+						II: {
+							mass: 20,
+							dps: 5
+						},
+						III: {
+							mass: 40,
+							dps: 8
+						},
+						IV: {
+							mass: 80,
+							dps: 12
+						},
+						V: {
+							mass: 160,
+							dps: 20
+						}
+					}
+				},
+				{
+					name: 'Rail Driver',
+					range: [2000,4000],
+					speed: 1000,
+					rank: {
+						I: {
+							mass: 45,
+							dps: 5
+						},
+						II: {
+							mass: 70,
+							dps: 6
+						},
+						III: {
+							mass: 105,
+							dps: 8
+						},
+						IV: {
+							mass: 160,
+							dps: 10
+						},
+						V: {
+							mass: 240,
+							dps: 13
+						}
+					}
+				}
+			];
+			
+			
+			var ShipTypes = [
+				{
+					name: 'Pathfinder',
+					classification: 'corvette',
+					rangeModifier: 1,
+					rangeSweep: 360,
+					image: document.getElementById('ship1'),
+					slots: {
+						armor: 1,
+						shields: 0,
+						weapons: 1,
+						specials: 0
+					},
+					cargo: 2000,
+					maxMass: 35,
+					baseMass: 5,
+					speed: {
+						forward: 240,
+						rotation: 55,
+						strafe: 140
+					},
+					health: 8,
+					size: {
+						w: 20,
+						h: 30
+					}
+				},
+				{
+					name: 'Voyager',
+					classification: 'corvette',
+					rangeModifier: 1,
+					rangeSweep: 360,
+					image: document.getElementById('ship1'),
+					slots: {
+						armor: 1,
+						shields: 1,
+						weapons: 2,
+						specials: 0
+					},
+					cargo: 6000,
+					maxMass: 110,
+					baseMass: 10,
+					speed: {
+						forward: 200,
+						rotation: 55,
+						strafe: 140
+					},
+					health: 15,
+					size: {
+						w: 30,
+						h: 40
+					}
+				},
+				{
+					name: 'Harrier',
+					classification: 'frigate',
+					rangeModifier: 1,
+					rangeSweep: 90,
+					image: document.getElementById('ship1'),
+					slots: {
+						armor: 1,
+						shields: 1,
+						weapons: 2,
+						specials: 0
+					},
+					cargo: 16000,
+					maxMass: 300,
+					baseMass: 20,
+					speed: {
+						forward: 360,
+						rotation: 30,
+						strafe: 270
+					},
+					health: 46,
+					size: {
+						w: 40,
+						h: 50
+					}
+				},
+				{
+					name: 'Genesis',
+					classification: 'cruiser',
+					rangeModifier: 1,
+					rangeSweep: 270,
+					image: document.getElementById('ship1'),
+					slots: {
+						armor: 2,
+						shields: 1,
+						weapons: 2,
+						specials: 2
+					},
+					cargo: 22000,
+					maxMass: 750,
+					baseMass: 10,
+					speed: {
+						forward: 280,
+						rotation: 20,
+						strafe: 140
+					},
+					health: 120,
+					size: {
+						w: 50,
+						h: 60
+					}
+				}
+			];
+			
+			var TO_RADIANS = Math.PI/180;
+			var flagship = {
+				type: ShipTypes[0],
+				mass: 30,
+				weapons: [
+					{
+						type: WeaponTypes[0],
+						rank: WeaponTypes[0].rank.I
+					}
+				],
+				specials: [],
+				armor: [],
+				speed: {
+					forward: 100,
+					rotation: 30,
+					strafe: 50
+				},
+				position: {
+					x: 0,
+					y: 100
+				},
+				shields: 0,
+				health: 30,
+				currentHealth: 30,
+				currentShields: 0,
+				guideslope: 0,
+				guidline: [],
+				theta: 0,
+				currentTheta: 0,
+				movementType: 'none',
+				team: 'blue',
+				fill: 'rgba(0,0,255,0.1)'
+			};
+			currentShip = flagship;
+			
+			var flagship2 = {
+				type: ShipTypes[2],
+				mass: 30,
+				weapons: [
+					{
+						type: WeaponTypes[1],
+						rank: WeaponTypes[1].rank.I
+					}
+				],
+				specials: [],
+				armor: [],
+				speed: {
+					forward: 360,
+					rotation: 30,
+					strafe: 270
+				},
+				position: {
+					x: 0,
+					y: -100
+				},
+				shields: 0,
+				health: 30,
+				currentHealth: 30,
+				currentShields: 0,
+				guideslope: 0,
+				guidline: [],
+				theta: 180*TO_RADIANS,
+				currentTheta: 180*TO_RADIANS,
+				movementType: 'none',
+				team: 'red',
+				fill: 'rgba(255,0,0,0.1)'
+			};
+			
+			function DrawRanges_Guidlines(ship){
+				//draw guidline
+				if (ship.guidline.length > 0){
+					context.beginPath();
+					context.moveTo(ship.position.x,ship.position.y);
+					context.lineTo(ship.guidline[0],ship.guidline[1]);
+					context.strokeStyle = 'yellow';
+					context.stroke();
+				}
+				//draw range
+				if (ship === currentShip) {
+			
+					context.beginPath();
+					var maxRadius = 0;
+					var minRadius = 0;
+					var C = 1/15;
+					ship.weapons.sort(function(a,b) { return a.type.range[0] - b.type.range[0] } );
+					minRadius = ship.weapons[0].type.range[0] * C;
+					ship.weapons.sort(function(a,b) { return a.type.range[1] - b.type.range[1] } );
+					maxRadius = ship.weapons[ship.weapons.length-1].type.range[1] * C;
+					if (ship.type.rangeSweep === 360) {
+						
+						if (minRadius > 0) {
+							context.arc(ship.position.x, ship.position.y,minRadius, 0, Math.PI, false);
+							context.arc(ship.position.x, ship.position.y,maxRadius, Math.PI, 0, true);
+							
+							context.arc(ship.position.x, ship.position.y,minRadius, Math.PI, 0, false);
+							context.arc(ship.position.x, ship.position.y,maxRadius, 0, Math.PI, true);
+							context.fillStyle = ship.fill;
+							context.fill();
+							context.closePath();
+							
+							context.beginPath();
+							context.arc(ship.position.x, ship.position.y,minRadius, 0, 2*Math.PI, false);
+							context.strokeStyle = ship.team;
+							context.stroke();
+							context.closePath();
+							
+							context.beginPath();
+							context.arc(ship.position.x, ship.position.y,maxRadius, 0, 2*Math.PI, false);
+						} else {
+							context.arc(ship.position.x, ship.position.y,maxRadius, 0, 2*Math.PI, false);
+							context.fillStyle = ship.fill;
+							context.fill();
+						}
+						
+					} else {
+						
+						var r = ship.type.rangeSweep*TO_RADIANS/2;
+						
+						if (minRadius > 0) {
+							context.arc(ship.position.x, ship.position.y,minRadius, ( (3*Math.PI/2) + ship.theta) - r, ( (3*Math.PI/2) + ship.theta) + r, false);
+							
+							context.arc(ship.position.x, ship.position.y,maxRadius, ( (3*Math.PI/2) + ship.theta) + r, ( (3*Math.PI/2) + ship.theta) - r, true);
+							
+							context.arc(ship.position.x, ship.position.y,minRadius, ( (3*Math.PI/2) + ship.theta) - r, ( (3*Math.PI/2) + ship.theta) -r, false);
+						} else {
+							context.moveTo(ship.position.x, ship.position.y);
+							context.arc(ship.position.x, ship.position.y,maxRadius, ( (3*Math.PI/2) + ship.theta) - r, ( (3*Math.PI/2) + ship.theta) + r, false);
+							context.lineTo(ship.position.x, ship.position.y);
+						}
+						
+						context.fillStyle = ship.fill;
+						context.fill();
+					}
+					context.strokeStyle = ship.team;
+					context.stroke();
+				}
+				
+				
+			}
+			
+			function DrawShip(ship){
+				//draw ship
+				var sX = -(0.5*ship.type.size.w);
+				var sY = -(0.5*ship.type.size.h);
+				
+				context.save();
+				//context.setTransform(1,0,0,1,0,0);
+				context.translate(ship.position.x,ship.position.y);
+				context.rotate(ship.theta);
+				context.drawImage(ship.type.image,sX,sY,ship.type.size.w,ship.type.size.h);
+				//context.drawImage(ship.type.image,sX,sY,ship.type.size.w,ship.type.size.h);
+				context.restore();
+			}
+			
+			function getSlope(xi,yi,xf,yf){
+				var dx = xf - xi;
+				var dy = yf - yi;
+				var m = 0;
+				var quadrant = 0;
+				if (dy < 0) {
+					if (dx < 0) {
+						quadrant = 3;
+					} else {
+						quadrant = 4;
+					}
+				} else {
+					if (dx < 0) {
+						quadrant = 2;
+					} else {
+						quadrant = 1;
+					}
+				}
+				
+				if (dx === 0) {
+					if (dy < 0) {
+						m = '-Infinity';
+					} else {
+						m = 'Infinity';
+					}
+				} else {
+					m = dy / dx;
+				}
+				return {m:m,q:quadrant};
+			}
+			function arctan(m,q) {
+				var theta =  0;
+				if (m === '-Infinity'){
+					theta = Math.PI / 2;
+				} else if (m === 'Infinity'){
+					theta = (3 * Math.PI) / 2;
+				} if (m < 0) {
+					theta = Math.atan(-m);
+				} else {
+					theta = Math.atan(m);
+				}
+				console.log((theta*180)/Math.PI);
+				return theta;
+			}
+			function nextPoint(xi,yi,theta,h,q,ship){
+				//h = hypotenus
+				if (ship.movementType === 'rear' || ship.movementType === 'rotate') {
+					ship.theta = theta;
+				}
+				var negS = 1;
+				var negC = 1;
+				//alert(q);
+				if (q === 1) {
+					negS = 1;
+					negC = 1;
+					if (ship.movementType === 'rear' || ship.movementType === 'rotate') {
+						ship.theta += Math.PI/2; //works
+					}
+				} else if (q === 2) {
+					negS = 1;
+					negC = -1;
+					if (ship.movementType === 'rear' || ship.movementType === 'rotate') {
+						ship.theta = (3*Math.PI/2) - ship.theta;
+					}
+				} else if (q === 3) {
+					negS = -1;
+					negC = -1;
+					if (ship.movementType === 'rear' || ship.movementType === 'rotate') {
+						ship.theta += 3*Math.PI/2; //works
+					}
+				} else if (q === 4) {
+					negS = -1;
+					negC = 1;
+					if (ship.movementType === 'rear' || ship.movementType === 'rotate') {
+						ship.theta = (Math.PI/2) - ship.theta;
+					}
+				}
+				var xf = negC*h*Math.cos(theta) + (xi);
+				var yf = negS*h*Math.sin(theta) + (yi);
+				
+				return {x:xf,y:yf};
+			}
+			function Norm(xi,yi,xf,yf){
+				return Math.sqrt(Math.pow(xf-xi,2)+Math.pow(yf-yi,2));
+			}
+			
+			function MoveShip(ship){
+				if (ship.guidline.length > 0){
+					var distance;
+					
+					var slope = ship.guideslope;
+					var theta = arctan(slope.m,slope.q);
+					
+					if (ship.movementType === 'rear') {
+						distance = (1/60)*ship.speed.forward;
+					} else if (ship.movementType === 'strafe'){
+						var C = ship.speed.strafe;
+						var t = Math.abs(ship.theta) - Math.abs(theta);
+						C = C*Math.abs(Math.cos(t))*1.25;
+						if ( C <= 0) {
+							C = 10;
+						}
+						distance = (1/60)*C;
+					}
+					
+					//console.log(xi+' , '+yi+' , '+theta+' , '+distance);
+					var point = nextPoint(ship.position.x,ship.position.y,theta,distance,slope.q,ship);
+					
+					var length = Norm(ship.position.x,ship.position.y,ship.guidline[0],ship.guidline[1]);
+					if (length < distance) {
+						ship.position.x = ship.guidline[0];
+						ship.guidline[0] = ship.position.x;
+						
+						ship.position.y = ship.guidline[1];
+						ship.guidline[1] = ship.position.y;
+					} else {
+						ship.position.x = point.x;
+						
+						ship.position.y = point.y;
+					}
+					
+					
+					if (ship.position.x === ship.guidline[0] && ship.position.y === ship.guidline[1]) {
+						ship.guidline.length = 0;
+					}
+				
+				}
+			}
+			
+			function draw() {
+				requestAnimationFrame(draw);
+				// Drawing code goes here
+				context.clearRect(-space_width/2,-space_height/2,space_width,space_height);
+				
+				MoveShip(flagship);
+				DrawRanges_Guidlines(flagship);
+				
+				MoveShip(flagship2);
+				DrawRanges_Guidlines(flagship2);
+				
+				DrawShip(flagship);
+				DrawShip(flagship2);
+			}
+
+			window.onload = function(){
+				
+				draw();
+			};
+			
+			space.addEventListener('click', function(e) {
+				var x = e.pageX - (space_width/2);
+				var y = e.pageY - (space_height/2);
+				
+				var xi = currentShip.position.x;
+				var yi = currentShip.position.y;
+				var xf = x;
+				var yf = y;
+				
+				currentShip.guideslope = getSlope(xi,yi,xf,yf);	
+				currentShip.guidline = [x,y];
+				currentShip.movementType = 'rear';
+			});
+			
+			if (space.addEventListener) {
+				space.addEventListener('contextmenu',function(e){
+					var x = e.pageX - (space_width/2);
+					var y = e.pageY - (space_height/2);
+					
+					var xi = currentShip.position.x;
+					var yi = currentShip.position.y;
+					var xf = x;
+					var yf = y;
+					
+					currentShip.guideslope = getSlope(xi,yi,xf,yf);	
+					currentShip.guidline = [x,y];
+					currentShip.movementType = 'strafe';
+					
+					e.preventDefault();
+				},false);
+			} else {
+				space.attachEvent('contextmenu',function(e){
+					window.event.returnValue = false;
+				});
+			}
+			
+			document.body.addEventListener('keydown', function(e) {
+				var key = e.which || e.keyCode;
+	
+				switch (key){
+					case 49: //1
+						currentShip = flagship;
+					break;
+					case 50: //2
+						currentShip = flagship2;
+					break;
+				}
+			},false);
+		</script>
+	</body>
+</html>
